@@ -1,0 +1,229 @@
+---
+title: "Just Take the Bus: Analysis of Toronto Bike Theft from 2022-2024"
+subtitle: tbd
+author:
+- Rayan Awad Alim
+- Samreen Gill
+thanks: https://github.com/RayanAlim/Toronto_Bike_Thefts_Data_Analysis
+date: "November 12, 2024"
+abstract: This analysis examines Bike theft data obtained from the Tronrot Police Data Portal.
+output: pdf_document
+toc: true
+number-sections: true
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup}
+#| include: false
+#| warning: false
+#| message: false
+# Workspace Set up 
+
+knitr::opts_chunk$set(echo=FALSE, include=TRUE, eval=TRUE)
+required_packages <- c(
+  "lubridate", "sf", "tidyverse", "ggplot2", "maps", "dplyr", "sf", "mapdata", "ggspatial", "opendatatoronto", "here"
+) 
+for (p in required_packages) { # install if missing
+  if (!require(p, character.only = TRUE)) {
+    install.packages(p, character.only = TRUE)
+  }
+}
+
+library(ggplot2)
+library(maps)
+library(dplyr)
+library(tidyverse)
+library(sf)
+library(mapdata)
+library(ggspatial)
+library(opendatatoronto)
+library(here)
+```
+
+```{r}
+#| include: false
+#| warning: false
+#| message: false
+# you are welcome to use either the CSV file or the GeoJSON file
+# GeoJSON format maybe useful if you would like to combine
+# an external geospatial dataset
+
+bike_thefts <- read_csv(here("Data", "Bicycle_Thefts_Open_Data.csv")) |>
+  mutate(
+    occurence_date = as_date(
+      OCC_DATE, format = "%a, %d %b %Y %H:%M:%S GMT"
+    ),
+    report_date = as_date(
+      REPORT_DATE, format = "%a, %d %b %Y %H:%M:%S GMT"
+    )
+  )
+bike_thefts_sf <- read_sf(here("Data", "Bicycle_Thefts_Open_Data.geojson")) |>
+  mutate(
+    occurence_date = as_date(
+      OCC_DATE, format = "%a, %d %b %Y %H:%M:%S GMT"
+    ),
+    report_date = as_date(
+      REPORT_DATE, format = "%a, %d %b %Y %H:%M:%S GMT"
+    )
+  )
+```
+
+```{r}
+#| include: false
+#| warning: false
+#| message: false
+#glimpse(bike_thefts)
+```
+
+
+## TIME TRENDS ANALYSIS 
+
+```{r}
+#BY MONTH
+bike_thefts %>%
+  count(OCC_MONTH) %>%
+  ggplot(aes(x = reorder(OCC_MONTH, n), y = n, fill = OCC_MONTH)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Bike Thefts by Month of the Year",
+       x = "Month", y = "Number of Thefts") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set3") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+```{r}
+# BY DAY OF WEEK
+bike_thefts %>%
+  count(OCC_DOW) %>%
+  ggplot(aes(x = OCC_DOW, y = n, fill = OCC_DOW)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Bike Thefts by Day of the Week",
+       x = "Day of the Week", y = "Number of Thefts") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set3")
+```
+
+```{r}
+# heaatmap of thefts by day of week and hour
+
+ggplot(bike_thefts, aes(x = OCC_DOW, y = OCC_HOUR)) +
+  geom_bin2d(bins = 24) +
+  scale_fill_gradient(low = "lightblue", high = "red") +
+  labs(title = "Heatmap of Bike Thefts by Day and Hour", 
+       x = "Day of Week", 
+       y = "Hour of Day") +
+  theme_minimal()
+```
+
+### Neighbour hood analysis and Maps
+
+
+```{r}
+#TOP TEN 
+bike_thefts %>%
+  count(NEIGHBOURHOOD_158) %>%
+  slice_max(n, n = 10) %>%
+  ggplot(aes(x = reorder(NEIGHBOURHOOD_158, n), y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 Neighborhoods for Bike Thefts",
+       x = "Neighborhood", y = "Number of Thefts") +
+  theme_minimal()
+```
+
+```{r}
+#| include: false
+#| warning: false
+#| message: false
+#MAP TBD
+#library(opendatatoronto)
+```
+
+### Bike Theft by Type and Cost
+Here we com[are] the frequency of thefts by bike type and cost distribution:
+
+```{r}
+# Barplot for bike types
+ggplot(bike_thefts, aes(x = BIKE_TYPE)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Number of Bike Thefts by Bike Type", x = "Bike Type", y = "Count") +
+  theme_minimal()
+```
+
+
+```{r}
+# Box plot for bike cost distribution by status
+ggplot(bike_thefts %>% filter(!is.na(BIKE_COST)), aes(x = STATUS, y = BIKE_COST)) +
+  geom_boxplot() +
+  labs(title = "Bike Cost Distribution (Recovered vs Stolen)", x = "Status", y = "Cost ($)") +
+  theme_minimal()
+```
+### Reporting Delays
+Analyzing the time delay between theft occurrence and reporting date (Not working, got to tweajk it some more)
+
+```{r}
+#| warning: false
+#| message: false
+# calcuate reporting delay
+bike_thefts <- bike_thefts %>%
+  mutate(reporting_delay = as.numeric(difftime(ymd_hms(REPORT_DATE), ymd_hms(OCC_DATE), units = "days")))
+
+ggplot(bike_thefts, aes(x = reporting_delay)) +
+  geom_histogram(binwidth = 1, fill = "purple", color = "black") +
+  labs(title = "Reporting Delays for Bike Thefts", x = "Days Delay", y = "Count") +
+  theme_minimal()
+```
+
+### Theft Recovery Analysis by Neighborhood
+which neighborhoods have higher recovery rates and analyzing the recovered vs unrecovered bikes by neighborhood
+
+```{r}
+# calculating recovery rate by neighborhood
+recovery_by_neighborhood <- bike_thefts %>%
+  group_by(NEIGHBOURHOOD_158) %>%
+  summarize(
+    total_thefts = n(),
+    recovered = sum(STATUS == "RECOVERED"),
+    recovery_rate = recovered / total_thefts
+  ) %>%
+  slice_max(recovery_rate, n = 10) # Get top 10 neighborhoods by recovery rate
+
+#  recovery rate by neighborhood
+ggplot(recovery_by_neighborhood, aes(x = reorder(NEIGHBOURHOOD_158, recovery_rate), y = recovery_rate)) +
+  geom_bar(stat = "identity", fill = "forestgreen") +
+  coord_flip() +
+  labs(title = "Top 10 Neighborhoods by Recovery Rate", x = "Neighborhood", y = "Recovery Rate") +
+  theme_minimal()
+```
+
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
