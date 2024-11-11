@@ -32,7 +32,6 @@ for (p in required_packages) { # install if missing
 }
 
 library(ggplot2)
-library(maps)
 library(dplyr)
 library(tidyverse)
 library(sf)
@@ -50,7 +49,7 @@ library(here)
 # GeoJSON format maybe useful if you would like to combine
 # an external geospatial dataset
 
-bike_thefts <- read_csv(here("Data", "Bicycle_Thefts_Open_Data.csv")) |>
+bike_thefts <- read_csv(here("Data", "Bike_thefts_raw.csv")) |>
   mutate(
     occurence_date = as_date(
       OCC_DATE, format = "%a, %d %b %Y %H:%M:%S GMT"
@@ -77,8 +76,57 @@ bike_thefts_sf <- read_sf(here("Data", "Bicycle_Thefts_Open_Data.geojson")) |>
 #glimpse(bike_thefts)
 ```
 
+Many cities are promoting bicycles to reduce reliance on cars,
+recognizing significant benefits cycling brings to the environment,
+public health and economy. As cyclists continue to gain popularity in
+Toronto, bicycle theft has emerged as a growing concern leaving many
+feeling vulnerable. With the increasing number of cyclists on the road,
+knowing when and where bike thefts are most likely to occur is crucial
+for protecting valuable bicycles. This analysis aims to inform the
+general public and cyclists about neighborhoods with the highest rate of
+thefts and times when their bikes are most likely to be stolen. This
+would not only raise awareness but also help people make more informed
+decisions to secure their bikes, ultimately reducing the risk of theft
+and fostering a safer cycling environment in Toronto. 
 
-## TIME TRENDS ANALYSIS 
+**Top 10  neighborhoods that  contribute to the most number of bicycle
+thefts across Toronto ?**
+
+We can see the worst neighborhood for bike thefts in Toronto is
+Yonge-Bay Corridor followed by Downtown Yonge East and St Lawrence East
+Bayfront, with each exceeding 1000 incidents from 2022 to 2024. In the
+past three years, about 5100 bikes were reported stolen from these
+areas. These neighborhoods contribute to approximately 17% of total
+bicycle thefts reported across Toronto. This high concentration reflects
+a combination of factors such as lack of secure bike storage, crowded
+public spaces making these areas prime targets for thieves. 
+
+How much do they contribute to total theft from 2022 to 2024 ? \
+(Comparing with premise type)An in-depth analysis of premise type
+unfolds that bicycles last parked outside building premises, whether
+residential or commercial are particularly vulnerable to theft. This
+trend is consistently observed in top 10 neighborhoods for bike theft.
+These locations, especially because of high foot or bike traffic,
+provide easy access and quick escape routes for criminals.
+
+\
+
+**When is your bike most likely to be stolen(day of the week, month) ?**
+
+\
+
+Based on the figures below, it is pretty evident the highest frequency
+of bicycle thefts occurs during July and August. This aligns with the
+warmer summer months when more people tend to ride bicycles, increasing
+both bicycles in public spaces and likelihood of theft. Thefts begin to
+build up during spring, peaking in summer, followed by a steady decline
+through fall and winter. The data suggests thefts are more common during
+weekdays, potentially because most people use bicycles to commute to
+work or school. Bicycles parked during weekdays are often unattended for
+several hours, providing thieves with ample time to steal them. 
+
+Additionally, the majority of bicycles get stolen during the night than
+in morning, afternoon or evening.
 
 ```{r}
 #BY MONTH
@@ -117,8 +165,7 @@ ggplot(bike_thefts, aes(x = OCC_DOW, y = OCC_HOUR)) +
   theme_minimal()
 ```
 
-### Neighbour hood analysis and Maps
-
+### Neighbourhood analysis and Maps
 
 ```{r}
 #TOP TEN 
@@ -142,7 +189,9 @@ bike_thefts %>%
 ```
 
 ### Bike Theft by Type and Cost
-Here we com[are] the frequency of thefts by bike type and cost distribution:
+
+Here we com[are] the frequency of thefts by bike type and cost
+distribution:
 
 ```{r}
 # Barplot for bike types
@@ -152,7 +201,6 @@ ggplot(bike_thefts, aes(x = BIKE_TYPE)) +
   theme_minimal()
 ```
 
-
 ```{r}
 # Box plot for bike cost distribution by status
 ggplot(bike_thefts %>% filter(!is.na(BIKE_COST)), aes(x = STATUS, y = BIKE_COST)) +
@@ -160,10 +208,14 @@ ggplot(bike_thefts %>% filter(!is.na(BIKE_COST)), aes(x = STATUS, y = BIKE_COST)
   labs(title = "Bike Cost Distribution (Recovered vs Stolen)", x = "Status", y = "Cost ($)") +
   theme_minimal()
 ```
+
 ### Reporting Delays
-Analyzing the time delay between theft occurrence and reporting date (Not working, got to tweajk it some more)
+
+Analyzing the time delay between theft occurrence and reporting date
+(Not working, got to tweajk it some more)
 
 ```{r}
+#| include: FALSE
 #| warning: false
 #| message: false
 # calcuate reporting delay
@@ -177,7 +229,9 @@ ggplot(bike_thefts, aes(x = reporting_delay)) +
 ```
 
 ### Theft Recovery Analysis by Neighborhood
-which neighborhoods have higher recovery rates and analyzing the recovered vs unrecovered bikes by neighborhood
+
+which neighborhoods have higher recovery rates and analyzing the
+recovered vs unrecovered bikes by neighborhood
 
 ```{r}
 # calculating recovery rate by neighborhood
@@ -198,32 +252,45 @@ ggplot(recovery_by_neighborhood, aes(x = reorder(NEIGHBOURHOOD_158, recovery_rat
   theme_minimal()
 ```
 
+```{r}
+# map
 
+# Count and filter top 10 neighborhoods with the highest thefts
+top_neighborhoods <- bike_thefts %>%
+  count(NEIGHBOURHOOD_158) %>%
+  slice_max(n, n = 10)
+
+# Treemap plot
+treemap::treemap(
+  top_neighborhoods,
+  index = "NEIGHBOURHOOD_158",  # Using neighborhood names as the index
+  vSize = "n",                  # Size by count of thefts
+  vColor = "n",                 # Color by count of thefts
+  palette = c("#2b5c8a", "goldenrod1", "#9e3d22"),
+  type = "manual",
+  align.labels = list(c("right", "top"), c("left", "bottom")),
+  overlap.labels = 0.2,
+  title = "Number of Bicycle Thefts by Neighborhood",
+  fontsize.title = 18,
+  title.legend = "Frequency",
+  fontsize.labels = 10, 
+)
+```
 
 ```{r}
 ```
 
+```{r}
+```
 
 ```{r}
 ```
 
+```{r}
+```
 
 ```{r}
 ```
 
-
 ```{r}
 ```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
