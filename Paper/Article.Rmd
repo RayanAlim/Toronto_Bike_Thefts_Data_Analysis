@@ -1,5 +1,5 @@
 ---
-title: "Just Take the Bus: Analysis of Toronto Bike Theft from 2022-2024"
+title: "Just Take the Bus: Analysis of Toronto Bike Theft from 2014-2023"
 subtitle: tbd
 author:
 - Rayan Awad Alim
@@ -23,7 +23,7 @@ editor_options:
 
 knitr::opts_chunk$set(echo=FALSE, include=TRUE, eval=TRUE)
 required_packages <- c(
-  "lubridate", "sf", "tidyverse", "ggplot2", "maps", "dplyr", "sf", "mapdata", "ggspatial", "opendatatoronto", "here"
+  "lubridate", "sf", "tidyverse", "ggplot2", "maps", "dplyr", "sf", "mapdata", "ggspatial", "opendatatoronto", "here", "treemap"
 ) 
 for (p in required_packages) { # install if missing
   if (!require(p, character.only = TRUE)) {
@@ -39,6 +39,7 @@ library(mapdata)
 library(ggspatial)
 library(opendatatoronto)
 library(here)
+library(treemap)
 ```
 
 ```{r}
@@ -109,6 +110,16 @@ trend is consistently observed in top 10 neighborhoods for bike theft.
 These locations, especially because of high foot or bike traffic,
 provide easy access and quick escape routes for criminals.
 
+
+```{r}
+# Samreen 
+# bar charts of general statistics:
+# # of bikes stole in 2021
+# # of bikes stole in 2022
+# # of bikes stole in 2023
+# Total Loss of x $ M 
+```
+
 \
 
 **When is your bike most likely to be stolen(day of the week, month) ?**
@@ -129,7 +140,9 @@ Additionally, the majority of bicycles get stolen during the night than
 in morning, afternoon or evening.
 
 ```{r}
-#BY MONTH
+#BY MONTH- Rayan
+# Note: Replace Legend title to "month" rather than variable name 
+# Order it based on month 
 bike_thefts %>%
   count(OCC_MONTH) %>%
   ggplot(aes(x = reorder(OCC_MONTH, n), y = n, fill = OCC_MONTH)) +
@@ -142,7 +155,9 @@ bike_thefts %>%
 ```
 
 ```{r}
-# BY DAY OF WEEK
+# BY DAY OF WEEK- Rayan
+# Note: Replace Legend title to "day" rather than varaible name 
+# Order it based on day 
 bike_thefts %>%
   count(OCC_DOW) %>%
   ggplot(aes(x = OCC_DOW, y = n, fill = OCC_DOW)) +
@@ -155,6 +170,9 @@ bike_thefts %>%
 
 ```{r}
 # heaatmap of thefts by day of week and hour
+# flip the time from 0-24 top to bottom
+# make "count" more meaningful 
+#Organize it by day of the week - Rayan
 
 ggplot(bike_thefts, aes(x = OCC_DOW, y = OCC_HOUR)) +
   geom_bin2d(bins = 24) +
@@ -169,6 +187,7 @@ ggplot(bike_thefts, aes(x = OCC_DOW, y = OCC_HOUR)) +
 
 ```{r}
 #TOP TEN 
+#Remove neighbour hood # from the name - Rayan
 bike_thefts %>%
   count(NEIGHBOURHOOD_158) %>%
   slice_max(n, n = 10) %>%
@@ -179,6 +198,28 @@ bike_thefts %>%
        x = "Neighborhood", y = "Number of Thefts") +
   theme_minimal()
 ```
+```{r}
+#colour to be something categorical #https://r-graph-gallery.com/38-rcolorbrewers-palettes.html - Rayan
+library(RColorBrewer)
+
+bike_thefts %>%
+  count(NEIGHBOURHOOD_158) %>%
+  arrange(desc(n)) %>%  
+  slice_max(n, n = 10) %>%
+  ggplot(aes(x = "", y = n, fill = reorder(NEIGHBOURHOOD_158, -n))) +  
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  geom_text(aes(label = paste0("(", round(n / sum(n) * 100, 1), "%)")),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            size = 4) +
+  labs(title = "Top 10 Neighborhoods for Bike Thefts",
+       fill = "Neighborhood") +
+  scale_fill_brewer(palette = "set3") +
+  theme_void() +  
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
 
 ```{r}
 #| include: false
@@ -186,6 +227,7 @@ bike_thefts %>%
 #| message: false
 #MAP TBD
 #library(opendatatoronto)
+# MAE THE MAP WORK! - Rayan
 ```
 
 ### Bike Theft by Type and Cost
@@ -195,18 +237,16 @@ distribution:
 
 ```{r}
 # Barplot for bike types
+# Add a legend with full name of bike type
 ggplot(bike_thefts, aes(x = BIKE_TYPE)) +
   geom_bar(fill = "steelblue") +
   labs(title = "Number of Bike Thefts by Bike Type", x = "Bike Type", y = "Count") +
   theme_minimal()
 ```
+### Cost 
 
 ```{r}
-# Box plot for bike cost distribution by status
-ggplot(bike_thefts %>% filter(!is.na(BIKE_COST)), aes(x = STATUS, y = BIKE_COST)) +
-  geom_boxplot() +
-  labs(title = "Bike Cost Distribution (Recovered vs Stolen)", x = "Status", y = "Cost ($)") +
-  theme_minimal()
+# Pie Chart of recovery vs stolen
 ```
 
 ### Reporting Delays
@@ -215,10 +255,15 @@ Analyzing the time delay between theft occurrence and reporting date
 (Not working, got to tweajk it some more)
 
 ```{r}
+# Pie Chart of recovery vs stolen
+```
+
+```{r}
 #| include: FALSE
 #| warning: false
 #| message: false
 # calcuate reporting delay
+# reporting vs theft and status of revovey
 bike_thefts <- bike_thefts %>%
   mutate(reporting_delay = as.numeric(difftime(ymd_hms(REPORT_DATE), ymd_hms(OCC_DATE), units = "days")))
 
@@ -250,37 +295,6 @@ ggplot(recovery_by_neighborhood, aes(x = reorder(NEIGHBOURHOOD_158, recovery_rat
   coord_flip() +
   labs(title = "Top 10 Neighborhoods by Recovery Rate", x = "Neighborhood", y = "Recovery Rate") +
   theme_minimal()
-```
-
-```{r}
-# map
-
-# Count and filter top 10 neighborhoods with the highest thefts
-top_neighborhoods <- bike_thefts %>%
-  count(NEIGHBOURHOOD_158) %>%
-  slice_max(n, n = 10)
-
-# Treemap plot
-treemap::treemap(
-  top_neighborhoods,
-  index = "NEIGHBOURHOOD_158",  # Using neighborhood names as the index
-  vSize = "n",                  # Size by count of thefts
-  vColor = "n",                 # Color by count of thefts
-  palette = c("#2b5c8a", "goldenrod1", "#9e3d22"),
-  type = "manual",
-  align.labels = list(c("right", "top"), c("left", "bottom")),
-  overlap.labels = 0.2,
-  title = "Number of Bicycle Thefts by Neighborhood",
-  fontsize.title = 18,
-  title.legend = "Frequency",
-  fontsize.labels = 10, 
-)
-```
-
-```{r}
-```
-
-```{r}
 ```
 
 ```{r}
