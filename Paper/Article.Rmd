@@ -1,6 +1,6 @@
 ---
 title: "Just Take the Bus: Analysis of Toronto Bike Theft from 2014-2023"
-subtitle: tbd
+subtitle: "Examining Patterns, Locations, and Factors of Bicycle Theft in Toronto"
 author:
 - Rayan Awad Alim
 - Samreen Gill
@@ -19,11 +19,25 @@ editor_options:
 #| include: false
 #| warning: false
 #| message: false
+
+
 # Workspace Set up 
 
 knitr::opts_chunk$set(echo=FALSE, include=TRUE, eval=TRUE)
 required_packages <- c(
-  "lubridate", "sf", "tidyverse", "ggplot2", "maps", "dplyr", "sf", "mapdata", "ggspatial", "opendatatoronto", "here", "treemap"
+  "lubridate",
+  "sf",
+  "tidyverse",
+  "ggplot2",
+  "maps",
+  "dplyr",
+  "mapdata",
+  "ggspatial",
+  "opendatatoronto",
+  "here",
+  "stringr",
+  "RColorBrewer",
+  "Scales"
 ) 
 for (p in required_packages) { # install if missing
   if (!require(p, character.only = TRUE)) {
@@ -31,25 +45,28 @@ for (p in required_packages) { # install if missing
   }
 }
 
-library(ggplot2)
-library(dplyr)
-library(tidyverse)
+library(lubridate)
 library(sf)
+library(tidyverse)
+library(ggplot2)
+library(maps)
+library(dplyr)
 library(mapdata)
 library(ggspatial)
 library(opendatatoronto)
 library(here)
-library(treemap)
+library(stringr)
+library(RColorBrewer)
+library(scales)
 ```
 
 ```{r}
 #| include: false
 #| warning: false
 #| message: false
-# you are welcome to use either the CSV file or the GeoJSON file
-# GeoJSON format maybe useful if you would like to combine
-# an external geospatial dataset
 
+
+# Load and process data from CSV and GeoJSON files
 bike_thefts <- read_csv(here("Data", "Bike_thefts_raw.csv")) |>
   mutate(
     occurence_date = as_date(
@@ -57,8 +74,10 @@ bike_thefts <- read_csv(here("Data", "Bike_thefts_raw.csv")) |>
     ),
     report_date = as_date(
       REPORT_DATE, format = "%a, %d %b %Y %H:%M:%S GMT"
-    )
+    ),
+    NEIGHBOURHOOD_Clean = str_remove(NEIGHBOURHOOD_158, "\\s*\\(\\d+\\)$")
   )
+
 bike_thefts_sf <- read_sf(here("Data", "Bicycle_Thefts_Open_Data.geojson")) |>
   mutate(
     occurence_date = as_date(
@@ -66,49 +85,28 @@ bike_thefts_sf <- read_sf(here("Data", "Bicycle_Thefts_Open_Data.geojson")) |>
     ),
     report_date = as_date(
       REPORT_DATE, format = "%a, %d %b %Y %H:%M:%S GMT"
-    )
+    ),
+    NEIGHBOURHOOD_Clean = str_remove(NEIGHBOURHOOD_158, "\\s*\\(\\d+\\)$")
   )
+
+toronto_shape <- read_sf(here("Data", "Neighbourhoods - 4326.shp")) 
 ```
+
 
 ```{r}
-#| include: false
-#| warning: false
-#| message: false
-#glimpse(bike_thefts)
+# glimpse(toronto_shape)
+# glimpse(bike_thefts)
 ```
 
-Many cities are promoting bicycles to reduce reliance on cars,
-recognizing significant benefits cycling brings to the environment,
-public health and economy. As cyclists continue to gain popularity in
-Toronto, bicycle theft has emerged as a growing concern leaving many
-feeling vulnerable. With the increasing number of cyclists on the road,
-knowing when and where bike thefts are most likely to occur is crucial
-for protecting valuable bicycles. This analysis aims to inform the
-general public and cyclists about neighborhoods with the highest rate of
-thefts and times when their bikes are most likely to be stolen. This
-would not only raise awareness but also help people make more informed
-decisions to secure their bikes, ultimately reducing the risk of theft
-and fostering a safer cycling environment in Toronto. 
+# Introduction
 
-**Top 10  neighborhoods that  contribute to the most number of bicycle
-thefts across Toronto ?**
+Many cities are promoting bicycles to reduce reliance on cars, recognizing significant benefits cycling brings to the environment, public health and economy. As cyclists continue to gain popularity in Toronto, bicycle theft has emerged as a growing concern leaving many feeling vulnerable. With the increasing number of cyclists on the road, knowing when and where bike thefts are most likely to occur is crucial for protecting valuable bicycles. This analysis aims to inform the general public and cyclists about neighborhoods with the highest rate of thefts and times when their bikes are most likely to be stolen. This would not only raise awareness but also help people make more informed decisions to secure their bikes, ultimately reducing the risk of theft and fostering a safer cycling environment in Toronto.
 
-We can see the worst neighborhood for bike thefts in Toronto is
-Yonge-Bay Corridor followed by Downtown Yonge East and St Lawrence East
-Bayfront, with each exceeding 1000 incidents from 2022 to 2024. In the
-past three years, about 5100 bikes were reported stolen from these
-areas. These neighborhoods contribute to approximately 17% of total
-bicycle thefts reported across Toronto. This high concentration reflects
-a combination of factors such as lack of secure bike storage, crowded
-public spaces making these areas prime targets for thieves. 
+**Top 10 neighborhoods that contribute to the most number of bicycle thefts across Toronto ?**
 
-How much do they contribute to total theft from 2022 to 2024 ? \
-(Comparing with premise type)An in-depth analysis of premise type
-unfolds that bicycles last parked outside building premises, whether
-residential or commercial are particularly vulnerable to theft. This
-trend is consistently observed in top 10 neighborhoods for bike theft.
-These locations, especially because of high foot or bike traffic,
-provide easy access and quick escape routes for criminals.
+We can see the worst neighborhood for bike thefts in Toronto is Yonge-Bay Corridor followed by Downtown Yonge East and St Lawrence East Bayfront, with each exceeding 1000 incidents from 2022 to 2024. In the past three years, about 5100 bikes were reported stolen from these areas. These neighborhoods contribute to approximately 17% of total bicycle thefts reported across Toronto. This high concentration reflects a combination of factors such as lack of secure bike storage, crowded public spaces making these areas prime targets for thieves.
+
+How much do they contribute to total theft from 2022 to 2024 ? (Comparing with premise type)An in-depth analysis of premise type unfolds that bicycles last parked outside building premises, whether residential or commercial are particularly vulnerable to theft. This trend is consistently observed in top 10 neighborhoods for bike theft. These locations, especially because of high foot or bike traffic, provide easy access and quick escape routes for criminals.
 
 
 ```{r}
@@ -120,133 +118,206 @@ provide easy access and quick escape routes for criminals.
 # Total Loss of x $ M 
 ```
 
-\
-
-**When is your bike most likely to be stolen(day of the week, month) ?**
-
-\
-
-Based on the figures below, it is pretty evident the highest frequency
-of bicycle thefts occurs during July and August. This aligns with the
-warmer summer months when more people tend to ride bicycles, increasing
-both bicycles in public spaces and likelihood of theft. Thefts begin to
-build up during spring, peaking in summer, followed by a steady decline
-through fall and winter. The data suggests thefts are more common during
-weekdays, potentially because most people use bicycles to commute to
-work or school. Bicycles parked during weekdays are often unattended for
-several hours, providing thieves with ample time to steal them. 
-
-Additionally, the majority of bicycles get stolen during the night than
-in morning, afternoon or evening.
+```{r}
+# colnames(toronto_shape)
+# colnames(thefts_by_neighborhood)
+```
 
 ```{r}
-#BY MONTH- Rayan
-# Note: Replace Legend title to "month" rather than variable name 
-# Order it based on month 
+thefts_by_neighborhood <- bike_thefts %>%
+  count(NEIGHBOURHOOD_Clean) %>%
+  rename(thefts_count = n)
+
+toronto_shape <- toronto_shape %>%
+  rename(NEIGHBOURHOOD_Clean = AREA_NA7)
+
+toronto_thefts_map <- toronto_shape %>%
+  left_join(thefts_by_neighborhood, by = "NEIGHBOURHOOD_Clean")
+
+ggplot(toronto_thefts_map) +
+  geom_sf(aes(fill = thefts_count), color = "grey", size = 0.1) +
+  scale_fill_viridis_c(option = "plasma", name = "Number of Thefts") +
+  labs(title = "Number of Bike Thefts per Neighborhood in Toronto") +
+  theme_void() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+premise type: 
+
+```{r}
+bike_thefts %>%
+  count(PREMISES_TYPE) %>%
+  ggplot(aes(x = "", y = n, fill = PREMISES_TYPE)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  labs(title = "Bike Theft by Location Type",
+       fill = "Location Type") +
+  theme_void()
+```
+
+## When is your bike most likely to be stolen(day of the week, month) ?
+
+Based on the figures below, it is pretty evident the highest frequency of bicycle thefts occurs during July and August. This aligns with the warmer summer months when more people tend to ride bicycles, increasing both bicycles in public spaces and likelihood of theft. Thefts begin to build up during spring, peaking in summer, followed by a steady decline through fall and winter. The data suggests thefts are more common during weekdays, potentially because most people use bicycles to commute to work or school. Bicycles parked during weekdays are often unattended for several hours, providing thieves with ample time to steal them.
+
+Additionally, the majority of bicycles get stolen during the night than in morning, afternoon or evening.
+
+```{r}
+# Bike Thefts by Month
+bike_thefts <- bike_thefts %>%
+  mutate(OCC_MONTH = factor(OCC_MONTH, levels = month.name))
+
 bike_thefts %>%
   count(OCC_MONTH) %>%
-  ggplot(aes(x = reorder(OCC_MONTH, n), y = n, fill = OCC_MONTH)) +
+  ggplot(aes(x = OCC_MONTH, y = n, fill = OCC_MONTH)) +
   geom_bar(stat = "identity") +
   labs(title = "Bike Thefts by Month of the Year",
-       x = "Month", y = "Number of Thefts") +
+       x = "Month", y = "Number of Thefts", fill = "Months") +
   theme_minimal() +
   scale_fill_brewer(palette = "Set3") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 ```
 
 ```{r}
-# BY DAY OF WEEK- Rayan
-# Note: Replace Legend title to "day" rather than varaible name 
-# Order it based on day 
+bike_thefts <- bike_thefts %>%
+  mutate(OCC_DOW = factor(OCC_DOW, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")))
+
 bike_thefts %>%
   count(OCC_DOW) %>%
   ggplot(aes(x = OCC_DOW, y = n, fill = OCC_DOW)) +
   geom_bar(stat = "identity") +
-  labs(title = "Bike Thefts by Day of the Week",
-       x = "Day of the Week", y = "Number of Thefts") +
+  labs(title = "Bike Theft Patterns by Week Day Slight Uptick on Fridays",
+       x = "Day of the Week", 
+       y = "Number of Thefts", 
+       fill = "Day of Week",
+       caption = "Bike thefts in Toronto show a consistent pattern across weekdays, with a small increase on Fridays.") +  
   theme_minimal() +
   scale_fill_brewer(palette = "Set3")
+
 ```
 
 ```{r}
-# heaatmap of thefts by day of week and hour
-# flip the time from 0-24 top to bottom
-# make "count" more meaningful 
-#Organize it by day of the week - Rayan
+bike_thefts <- bike_thefts %>%
+  mutate(OCC_DOW = factor(OCC_DOW, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")))
 
 ggplot(bike_thefts, aes(x = OCC_DOW, y = OCC_HOUR)) +
   geom_bin2d(bins = 24) +
-  scale_fill_gradient(low = "lightblue", high = "red") +
-  labs(title = "Heatmap of Bike Thefts by Day and Hour", 
-       x = "Day of Week", 
-       y = "Hour of Day") +
-  theme_minimal()
+  scale_y_reverse() + 
+  scale_fill_gradient(low = "lightblue", high = "red", name = "Number of Thefts") +  
+  labs(
+    title = "Bike Theft Patterns by Day and Hour",
+    x = "Day of the Week",
+    y = "Hour of Day",
+    caption = "TBD",
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 ```
 
 ### Neighbourhood analysis and Maps
 
 ```{r}
-#TOP TEN 
-#Remove neighbour hood # from the name - Rayan
 bike_thefts %>%
-  count(NEIGHBOURHOOD_158) %>%
+  count(NEIGHBOURHOOD_Clean) %>%
   slice_max(n, n = 10) %>%
-  ggplot(aes(x = reorder(NEIGHBOURHOOD_158, n), y = n)) +
+  ggplot(aes(x = reorder(NEIGHBOURHOOD_Clean, n), y = n)) +
   geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(aes(label = n), hjust = 1.2, color = "white") +
   coord_flip() +
-  labs(title = "Top 10 Neighborhoods for Bike Thefts",
+  labs(title = "Downtown Danger: Top 10 Neighborhoods for Bike Thefts",
        x = "Neighborhood", y = "Number of Thefts") +
   theme_minimal()
 ```
-```{r}
-#colour to be something categorical #https://r-graph-gallery.com/38-rcolorbrewers-palettes.html - Rayan
-library(RColorBrewer)
 
+```{r}
 bike_thefts %>%
-  count(NEIGHBOURHOOD_158) %>%
-  arrange(desc(n)) %>%  
+  count(NEIGHBOURHOOD_Clean) %>%
+  arrange(desc(n)) %>%
   slice_max(n, n = 10) %>%
-  ggplot(aes(x = "", y = n, fill = reorder(NEIGHBOURHOOD_158, -n))) +  
+  ggplot(aes(x = "", y = n, fill = reorder(NEIGHBOURHOOD_Clean, -n))) +
   geom_bar(stat = "identity", width = 1) +
   coord_polar("y", start = 0) +
   geom_text(aes(label = paste0("(", round(n / sum(n) * 100, 1), "%)")),
             position = position_stack(vjust = 0.5),
-            color = "white",
-            size = 4) +
+            color = "white", size = 4) +
   labs(title = "Top 10 Neighborhoods for Bike Thefts",
        fill = "Neighborhood") +
-  scale_fill_brewer(palette = "set3") +
-  theme_void() +  
+  scale_fill_brewer(palette = "Paired") +
+  theme_void() +
   theme(plot.title = element_text(hjust = 0.5))
+
 ```
 
-
-```{r}
-#| include: false
-#| warning: false
-#| message: false
-#MAP TBD
-#library(opendatatoronto)
-# MAE THE MAP WORK! - Rayan
-```
 
 ### Bike Theft by Type and Cost
 
-Here we com[are] the frequency of thefts by bike type and cost
-distribution:
-
 ```{r}
-# Barplot for bike types
-# Add a legend with full name of bike type
-ggplot(bike_thefts, aes(x = BIKE_TYPE)) +
-  geom_bar(fill = "steelblue") +
-  labs(title = "Number of Bike Thefts by Bike Type", x = "Bike Type", y = "Count") +
+total_cost_by_neighborhood <- bike_thefts %>%
+  group_by(NEIGHBOURHOOD_Clean) %>%
+  summarize(total_cost = sum(BIKE_COST, na.rm = TRUE)) 
+
+toronto_cost_map <- toronto_shape %>%
+  left_join(total_cost_by_neighborhood, by = c("NEIGHBOURHOOD_Clean" = "NEIGHBOURHOOD_Clean"))
+
+ggplot(toronto_cost_map) +
+  geom_sf(aes(fill = total_cost), color = "grey", size = 0.1) +
+scale_fill_viridis_c(option = "inferno", name = "Total Theft Cost ($)",
+                       breaks = seq(0, max(toronto_cost_map$total_cost, na.rm = TRUE), length.out = 10),
+                       labels = scales::comma_format()) + 
+  labs(title = "Total Cost of Bike Thefts per Neighborhood in Toronto") +
+  theme_void() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Here we look at the frequency of thefts by bike type:\n
+```{r}
+total_cost_by_neighborhood %>%
+  arrange(desc(total_cost)) %>%
+  slice_max(total_cost, n = 10) %>%  
+  ggplot(aes(x = reorder(NEIGHBOURHOOD_Clean, total_cost), y = total_cost)) +
+  geom_bar(stat = "identity", fill = "tan4") +
+  geom_text(aes(label = scales::comma(total_cost)), hjust = 1.2, color = "white") +
+  coord_flip() +
+  labs(title = "Top 10 Neighborhoods by Total Theft Cost",
+       x = "Neighborhood", y = "Total Theft Cost ($)") +
   theme_minimal()
 ```
-### Cost 
 
 ```{r}
-# Pie Chart of recovery vs stolen
+bike_type_names <- c(
+  "BM" = "BMX", 
+  "EL" = "Electric Bike", 
+  "FO" = "Folding Bike", 
+  "MT" = "Mountain Bike", 
+  "OT" = "Other Bike", 
+  "RC" = "Road Bike", 
+  "RE" = "Hybrid Bike",
+  "RG" = "??", 
+  "SC" = "??", 
+  "TA" = "??", 
+  "TO" = "??", 
+  "TR" = "??", 
+  "UN" = "Unspecified"
+)
+
+custom_colors <- c("royalblue", "maroon3", "springgreen4", "salmon",
+                   "purple4", "wheat2", "maroon", "seagreen1", "khaki4",
+                   "lightseagreen", "#9b59b6", "chocolate1", "red3")
+
+ggplot(bike_thefts, aes(x = BIKE_TYPE, fill = BIKE_TYPE)) +
+  geom_bar() +
+  labs(
+    title = "Number of Bike Thefts by Bike Type",
+    x = "Bike Type",
+    y = "Count",
+    fill = "Bike Type"  
+  ) +
+  scale_fill_manual(values = custom_colors, labels = bike_type_names) +  
+  theme_minimal() +
+  theme(
+    legend.position = "right",  
+    axis.text.x = element_text(angle = 45, hjust = 1)  
+  )
 ```
 
 ### Reporting Delays
@@ -256,22 +327,49 @@ Analyzing the time delay between theft occurrence and reporting date
 
 ```{r}
 # Pie Chart of recovery vs stolen
-```
 
+recovery_status <- bike_thefts %>%
+  count(STATUS) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+ggplot(recovery_status, aes(x = "", y = n, fill = STATUS)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5),
+            color = "white") +
+  labs(title = "Bike Recovery Status: Recovered vs Stolen",
+       fill = "Status") +
+  theme_void() +
+  scale_fill_brewer(palette = "Dark2")
+
+```
 ```{r}
-#| include: FALSE
-#| warning: false
-#| message: false
-# calcuate reporting delay
-# reporting vs theft and status of revovey
-bike_thefts <- bike_thefts %>%
-  mutate(reporting_delay = as.numeric(difftime(ymd_hms(REPORT_DATE), ymd_hms(OCC_DATE), units = "days")))
+# MAP OF RECOVERY RATE 
+recovery_by_neighborhood <- bike_thefts %>%
+  group_by(NEIGHBOURHOOD_Clean) %>%
+  summarize(
+    total_thefts = n(),
+    recovered = sum(STATUS == "RECOVERED", na.rm = TRUE),
+    recovery_rate = recovered / total_thefts
+  )
 
-ggplot(bike_thefts, aes(x = reporting_delay)) +
-  geom_histogram(binwidth = 1, fill = "purple", color = "black") +
-  labs(title = "Reporting Delays for Bike Thefts", x = "Days Delay", y = "Count") +
-  theme_minimal()
+
+if (!"sf" %in% class(recovery_by_neighborhood)) {
+  toronto_recovery_map <- toronto_shape %>%
+    left_join(recovery_by_neighborhood, by = "NEIGHBOURHOOD_Clean")
+} else {
+  toronto_recovery_map <- st_join(toronto_shape, recovery_by_neighborhood, left = TRUE)
+}
+
+ggplot(toronto_recovery_map) +
+  geom_sf(aes(fill = recovery_rate), color = "grey") +
+  scale_fill_viridis_c(option = "plasma", name = "Recovery Rate") +
+  labs(title = "Bike Theft Recovery Rate by Neighborhood in Toronto") +
+  theme_void() +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
+
 
 ### Theft Recovery Analysis by Neighborhood
 
@@ -281,30 +379,17 @@ recovered vs unrecovered bikes by neighborhood
 ```{r}
 # calculating recovery rate by neighborhood
 recovery_by_neighborhood <- bike_thefts %>%
-  group_by(NEIGHBOURHOOD_158) %>%
+  group_by(NEIGHBOURHOOD_Clean) %>%
   summarize(
     total_thefts = n(),
     recovered = sum(STATUS == "RECOVERED"),
     recovery_rate = recovered / total_thefts
   ) %>%
-  slice_max(recovery_rate, n = 10) # Get top 10 neighborhoods by recovery rate
+  slice_max(recovery_rate, n = 10) 
 
-#  recovery rate by neighborhood
-ggplot(recovery_by_neighborhood, aes(x = reorder(NEIGHBOURHOOD_158, recovery_rate), y = recovery_rate)) +
+ggplot(recovery_by_neighborhood, aes(x = reorder(NEIGHBOURHOOD_Clean, recovery_rate), y = recovery_rate)) +
   geom_bar(stat = "identity", fill = "forestgreen") +
   coord_flip() +
   labs(title = "Top 10 Neighborhoods by Recovery Rate", x = "Neighborhood", y = "Recovery Rate") +
   theme_minimal()
-```
-
-```{r}
-```
-
-```{r}
-```
-
-```{r}
-```
-
-```{r}
 ```
