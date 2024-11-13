@@ -39,7 +39,8 @@ required_packages <- c(
   "RColorBrewer",
   "Scales",
   "pak",
-  "patchwork"
+  "patchwork",
+  "gridExtra"
 ) 
 for (p in required_packages) { # install if missing
   if (!require(p, character.only = TRUE)) {
@@ -62,6 +63,7 @@ library(RColorBrewer)
 library(scales)
 library(pak)
 library(patchwork)
+library(gridExtra)
 ```
 
 ```{r}
@@ -168,7 +170,7 @@ secure bike storage facilities and ensure public bike racks are located
 in well-monitored, well-lit locations.
 
 ```{r}
-thefts_by_neighborhood <- bike_thefts %>%
+plot_1<- thefts_by_neighborhood <- bike_thefts %>%
   count(NEIGHBOURHOOD_Clean) %>%
   rename(thefts_count = n)
 
@@ -178,29 +180,27 @@ toronto_shape <- toronto_shape %>%
 toronto_thefts_map <- toronto_shape %>%
   left_join(thefts_by_neighborhood, by = "NEIGHBOURHOOD_Clean")
 
- ggplot(toronto_thefts_map) +
+ plot_1<-ggplot(toronto_thefts_map) +
   geom_sf(aes(fill = thefts_count), color = "grey", size = 0.1) +
-  scale_fill_viridis_c(option = "plasma", name = "Number of Thefts") +
-  labs(title = "Number of Bike Thefts per Neighborhood in Toronto") +
+  scale_fill_viridis_c(option = "plasma", name = "No. of Thefts") +
+  labs(caption = "Thefts per Neighborhood in Toronto") +
   theme_void() +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.caption = element_text(hjust = 0.5))
 
 
 
 
-bike_thefts %>%
+plot_2<- bike_thefts %>%
   count(PREMISES_TYPE) %>%
    ggplot(aes(x = "", y = n, fill = PREMISES_TYPE)) +
   geom_bar(stat = "identity", width = 1) +
   coord_polar("y") +
-  labs(title = "Bike Theft by Location Type",
+  labs(caption = "Thefts by Location Type",
        fill = "Location Type") +
   theme_void()
 
 
-# Display the plots side by side
-#(plot_1 | plot_spacer() | plot_2) + 
- # plot_layout(widths = c(1, 0.3, 1)) 
+grid.arrange(plot_1, plot_2, ncol=2, widths = c(2, 2))
 
 ```
 
@@ -230,11 +230,13 @@ bike_thefts %>%
   count(OCC_MONTH) %>%
   ggplot(aes(x = OCC_MONTH, y = n, fill = OCC_MONTH)) +
   geom_bar(stat = "identity") +
-  labs(title = "Bike Thefts by Month of the Year",
-       x = "Month", y = "Number of Thefts", fill = "Months") +
+  labs(caption = "Bike Thefts by Month of the Year",
+       x = "Month", y = "Number of Thefts") +
   theme_minimal() +
   scale_fill_brewer(palette = "Set3") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = "none") +
+  theme(plot.caption = element_text(hjust = 0.5))
 ```
 
 ```{r}
@@ -251,7 +253,8 @@ bike_thefts %>%
        fill = "Day of Week",
        caption = "Bike thefts in Toronto show a consistent pattern across weekdays, with a small increase on Fridays.") +  
   theme_minimal() +
-  scale_fill_brewer(palette = "Set3")
+  scale_fill_brewer(palette = "Set3")+
+  guides(fill = "none")
 
 ```
 
@@ -405,7 +408,8 @@ ggplot(recovery_status, aes(x = "", y = n, fill = STATUS)) +
   labs(title = "Bike Recovery Status: Recovered vs Stolen",
        fill = "Status") +
   theme_void() +
-  scale_fill_brewer(palette = "Dark2")
+  scale_fill_brewer(palette = "Dark2") +
+  theme(title = element_text(hjust = 0.5, size = 12))
 
 ```
 
