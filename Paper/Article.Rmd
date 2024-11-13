@@ -3,10 +3,10 @@ title: "Just Take the Bus: Analysis of Toronto Bike Theft from 2014-2023"
 subtitle: "Examining Patterns, Locations, and Factors of Bicycle Theft in Toronto"
 author:
 - Rayan Awad Alim
-- Samreen Gill
+- Samreen Kaur
 thanks: https://github.com/RayanAlim/Toronto_Bike_Thefts_Data_Analysis
-date: "November 12, 2024"
-abstract: This analysis examines Bike theft data obtained from the Tronrot Police Data Portal.
+# date: "November 12, 2024"
+# abstract: This analysis examines Bike theft data obtained from the Tronrot Police Data Portal.
 output: pdf_document
 toc: true
 number-sections: true
@@ -19,9 +19,9 @@ editor_options:
 #| include: false
 #| warning: false
 #| message: false
+rm(list=ls())
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
 
-
-# Workspace Set up 
 
 knitr::opts_chunk$set(echo=FALSE, include=TRUE, eval=TRUE)
 required_packages <- c(
@@ -37,7 +37,9 @@ required_packages <- c(
   "here",
   "stringr",
   "RColorBrewer",
-  "Scales"
+  "Scales",
+  "pak",
+  "patchwork"
 ) 
 for (p in required_packages) { # install if missing
   if (!require(p, character.only = TRUE)) {
@@ -58,6 +60,8 @@ library(here)
 library(stringr)
 library(RColorBrewer)
 library(scales)
+library(pak)
+library(patchwork)
 ```
 
 ```{r}
@@ -92,36 +96,76 @@ bike_thefts_sf <- read_sf(here("Data", "Bicycle_Thefts_Open_Data.geojson")) |>
 toronto_shape <- read_sf(here("Data", "Neighbourhoods - 4326.shp")) 
 ```
 
-
 ```{r}
 # glimpse(toronto_shape)
 # glimpse(bike_thefts)
 ```
 
-# Introduction
+This analysis aims to inform the general public and cyclists about
+Toronto’s bike theft hotspots, highlighting neighborhoods with the
+highest rate of thefts and times when bikes are most at risk. It would
+not only raise awareness but also help general public and Toronto police
+take proactive measures to secure bikes, ultimately reducing the risk of
+theft and fostering a safer cycling environment in Toronto.
 
-Many cities are promoting bicycles to reduce reliance on cars, recognizing significant benefits cycling brings to the environment, public health and economy. As cyclists continue to gain popularity in Toronto, bicycle theft has emerged as a growing concern leaving many feeling vulnerable. With the increasing number of cyclists on the road, knowing when and where bike thefts are most likely to occur is crucial for protecting valuable bicycles. This analysis aims to inform the general public and cyclists about neighborhoods with the highest rate of thefts and times when their bikes are most likely to be stolen. This would not only raise awareness but also help people make more informed decisions to secure their bikes, ultimately reducing the risk of theft and fostering a safer cycling environment in Toronto.
+### Bicycle Theft over time: Tracking trends in top 10 neighborhoods
 
-**Top 10 neighborhoods that contribute to the most number of bicycle thefts across Toronto ?**
-
-We can see the worst neighborhood for bike thefts in Toronto is Yonge-Bay Corridor followed by Downtown Yonge East and St Lawrence East Bayfront, with each exceeding 1000 incidents from 2022 to 2024. In the past three years, about 5100 bikes were reported stolen from these areas. These neighborhoods contribute to approximately 17% of total bicycle thefts reported across Toronto. This high concentration reflects a combination of factors such as lack of secure bike storage, crowded public spaces making these areas prime targets for thieves.
-
-How much do they contribute to total theft from 2022 to 2024 ? (Comparing with premise type)An in-depth analysis of premise type unfolds that bicycles last parked outside building premises, whether residential or commercial are particularly vulnerable to theft. This trend is consistently observed in top 10 neighborhoods for bike theft. These locations, especially because of high foot or bike traffic, provide easy access and quick escape routes for criminals.
-
+Analyzing trend in bicycle theft over past 5 years, notice that there is
+approximately 15% drop in bike thefts from 2019 to 2023. This suggests
+bike theft was a significant issue prior to COVID-19 pandemic. During
+2020 and 2021, decline in thefts could be associated with lock down and
+reduced outdoor activities since fewer people were commuting and leaving
+their bikes in public spaces. The gradual stabilization in subsequent
+years(2022 and 2023) reflects either became more cautious about security
+of their bikes or thieves shifted their focus to other crimes, making
+theft less prevalent in these neighborhoods.
 
 ```{r}
-# Samreen 
-# bar charts of general statistics:
-# # of bikes stole in 2021
-# # of bikes stole in 2022
-# # of bikes stole in 2023
-# Total Loss of x $ M 
+# total thefts by year in top 10 neighborhoods
+
+bike_thefts %>%
+  filter(OCC_YEAR %in% c(2019, 2020, 2021, 2022, 2023)) %>%
+  group_by(OCC_YEAR, NEIGHBOURHOOD_Clean) %>%
+  count() %>%
+  ungroup() %>%
+  group_by(OCC_YEAR) %>%
+  top_n(10, n) %>%
+  summarise(total_thefts = sum(n)) %>%
+  ggplot(aes(x = factor(OCC_YEAR), y = total_thefts, group = 1)) + 
+  geom_line(color = "#458CFF") +
+  geom_point(size = 3) +
+  labs(title = "Total Bike Thefts in Top 10 Neighborhoods (2019-2023)",
+       x = "Year", y = "Total Thefts") +
+  theme_minimal() +
+  theme(legend.position = "none")
 ```
 
-```{r}
-# colnames(toronto_shape)
-# colnames(thefts_by_neighborhood)
-```
+### Your bike is most likely to be stolen in Downtown
+
+The worst neighborhood for bike thefts in Toronto is Yonge-Bay Corridor
+followed by Downtown Yonge East and St Lawrence East Bayfront, with each
+exceeding 1000 incidents over last 5 years. In the past three years,
+about 5100 bikes were reported stolen from these areas. These
+neighborhoods contribute to approximately 17% of total bicycle thefts
+reported across Toronto. This high concentration reflects a combination
+of factors such as lack of secure bike storage, crowded public spaces
+making these areas prime targets for thieves.
+
+Among these incidents, bicycles are predominantly stolen outside
+building premises, whether residential or commercial. This trend is
+consistently observed in top 10 neighborhoods for bike theft. These
+locations, especially because of high foot or bike traffic, provide easy
+access and quick escape routes for criminals. Moreover outdoor spaces
+often lack surveillance cameras, making it easier for thieves to act
+without being noticed. Similarly, bike storage areas in apartments, such
+as shared parking garages or storage rooms, offer limited protection due
+to communal access resulting in high volume of thefts. The visualization
+below shows that bikes are safe when bikers are at school or in transit.
+Bikers association can use these findings to educate bikers about safe
+storage practices especially in outdoor spaces and apartments. City
+planners should in coordination with apartment managers to install
+secure bike storage facilities and ensure public bike racks are located
+in well-monitored, well-lit locations.
 
 ```{r}
 thefts_by_neighborhood <- bike_thefts %>%
@@ -134,31 +178,48 @@ toronto_shape <- toronto_shape %>%
 toronto_thefts_map <- toronto_shape %>%
   left_join(thefts_by_neighborhood, by = "NEIGHBOURHOOD_Clean")
 
-ggplot(toronto_thefts_map) +
+ ggplot(toronto_thefts_map) +
   geom_sf(aes(fill = thefts_count), color = "grey", size = 0.1) +
   scale_fill_viridis_c(option = "plasma", name = "Number of Thefts") +
   labs(title = "Number of Bike Thefts per Neighborhood in Toronto") +
   theme_void() +
   theme(plot.title = element_text(hjust = 0.5))
-```
-premise type: 
 
-```{r}
+
+
+
 bike_thefts %>%
   count(PREMISES_TYPE) %>%
-  ggplot(aes(x = "", y = n, fill = PREMISES_TYPE)) +
+   ggplot(aes(x = "", y = n, fill = PREMISES_TYPE)) +
   geom_bar(stat = "identity", width = 1) +
   coord_polar("y") +
   labs(title = "Bike Theft by Location Type",
        fill = "Location Type") +
   theme_void()
+
+
+# Display the plots side by side
+#(plot_1 | plot_spacer() | plot_2) + 
+ # plot_layout(widths = c(1, 0.3, 1)) 
+
 ```
 
-## When is your bike most likely to be stolen(day of the week, month) ?
+### Seasonal and weekly patterns of bicycle theft
 
-Based on the figures below, it is pretty evident the highest frequency of bicycle thefts occurs during July and August. This aligns with the warmer summer months when more people tend to ride bicycles, increasing both bicycles in public spaces and likelihood of theft. Thefts begin to build up during spring, peaking in summer, followed by a steady decline through fall and winter. The data suggests thefts are more common during weekdays, potentially because most people use bicycles to commute to work or school. Bicycles parked during weekdays are often unattended for several hours, providing thieves with ample time to steal them.
-
-Additionally, the majority of bicycles get stolen during the night than in morning, afternoon or evening.
+The highest frequency of bicycle thefts occurs during July and August.
+This aligns with the warmer summer months when more people tend to ride
+bicycles, increasing both bicycles in public spaces and their likelihood
+of theft. Thefts begin to build up during spring, peaking in summer,
+followed by a steady decline through fall and winter. The data suggests
+thefts are more common during weekdays, potentially because most people
+use bicycles to commute to work or school. Bicycles parked during
+weekdays are often unattended for several hours, providing thieves with
+ample time to steal them. On weekends, cyclists may spend more time with
+their bikes using them for recreational purposes, which means bicycles
+are less likely to be left unattended in public spaces leading to slight
+decrease in thefts during weekends. This shows Toronto police should
+allocate more resources in downtown particularly during weekdays to
+reduce the frequency of theft in high-risk areas.
 
 ```{r}
 # Bike Thefts by Month
@@ -194,6 +255,16 @@ bike_thefts %>%
 
 ```
 
+### The Hidden Danger: Nighttime bicycle thefts in Downtown
+
+Bike thefts are more prevalent during night, primarily due to the cover
+of darkness thieves couldn't be easily detected. In downtown, during
+weekdays these neighborhoods tend to be less crowded and there are fewer
+people to notice any suspicious activity. Although people leave there
+bikes locked overnight, thieves tend to break locks or steal parts of
+bikes to resell them. This calls for improved lighting and overnight
+surveillance to deter thieves during these vulnerable hours.
+
 ```{r}
 bike_thefts <- bike_thefts %>%
   mutate(OCC_DOW = factor(OCC_DOW, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")))
@@ -214,42 +285,18 @@ ggplot(bike_thefts, aes(x = OCC_DOW, y = OCC_HOUR)) +
   )
 ```
 
-### Neighbourhood analysis and Maps
+### Toronto's Bike theft economy: Hidden costs for all
 
-```{r}
-bike_thefts %>%
-  count(NEIGHBOURHOOD_Clean) %>%
-  slice_max(n, n = 10) %>%
-  ggplot(aes(x = reorder(NEIGHBOURHOOD_Clean, n), y = n)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  geom_text(aes(label = n), hjust = 1.2, color = "white") +
-  coord_flip() +
-  labs(title = "Downtown Danger: Top 10 Neighborhoods for Bike Thefts",
-       x = "Neighborhood", y = "Number of Thefts") +
-  theme_minimal()
-```
-
-```{r}
-bike_thefts %>%
-  count(NEIGHBOURHOOD_Clean) %>%
-  arrange(desc(n)) %>%
-  slice_max(n, n = 10) %>%
-  ggplot(aes(x = "", y = n, fill = reorder(NEIGHBOURHOOD_Clean, -n))) +
-  geom_bar(stat = "identity", width = 1) +
-  coord_polar("y", start = 0) +
-  geom_text(aes(label = paste0("(", round(n / sum(n) * 100, 1), "%)")),
-            position = position_stack(vjust = 0.5),
-            color = "white", size = 4) +
-  labs(title = "Top 10 Neighborhoods for Bike Thefts",
-       fill = "Neighborhood") +
-  scale_fill_brewer(palette = "Paired") +
-  theme_void() +
-  theme(plot.title = element_text(hjust = 0.5))
-
-```
-
-
-### Bike Theft by Type and Cost
+Bicycle theft in Toronto has a broader economic impact beyond the direct
+cost to individual victims. It not only affects personal finances of
+bikers but also the local economy and public perception of safety in the
+city. Bike thefts deter people from using bikes as primary mode of
+transport affecting businesses like bike shops, repair services that
+solely rely on cyclists as customers. Moreover, with thousands of thefts
+being reported annually requires police resources for investigation and
+record-keeping. This strain on law enforcement can becomes costly,
+ultimately impacting taxpayers when more resources are allocated to
+reduce thefts.
 
 ```{r}
 total_cost_by_neighborhood <- bike_thefts %>%
@@ -269,19 +316,21 @@ scale_fill_viridis_c(option = "inferno", name = "Total Theft Cost ($)",
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-Here we look at the frequency of thefts by bike type:\n
-```{r}
-total_cost_by_neighborhood %>%
-  arrange(desc(total_cost)) %>%
-  slice_max(total_cost, n = 10) %>%  
-  ggplot(aes(x = reorder(NEIGHBOURHOOD_Clean, total_cost), y = total_cost)) +
-  geom_bar(stat = "identity", fill = "tan4") +
-  geom_text(aes(label = scales::comma(total_cost)), hjust = 1.2, color = "white") +
-  coord_flip() +
-  labs(title = "Top 10 Neighborhoods by Total Theft Cost",
-       x = "Neighborhood", y = "Total Theft Cost ($)") +
-  theme_minimal()
-```
+### Mountain and Regular bikes are the most stolen bikes
+
+Mountain and regular bikes are most commonly stolen, with each group
+accounting for 30% of overall theft. The high theft rates for these
+types may be attributed to their popularity and general accessibility in
+Toronto, as they both are commonly used for commuting and recreational
+purposes in Toronto. Theft of electric bikes are relatively lower in
+comparison. This may be because of increased weight of bikes, or added
+security features often built into them. Scooters and other unique types
+of bicycles like tandem, tricycles, and unicycles show very low theft
+rates, likely because they are less commonly used. Bike association
+should encourage bike owners, especially those with high-risk models
+like Mountain and Regular bikes, to install GPS trackers. These devices
+can be discreetly attached to bikes and synced with smartphone apps,
+enabling real-time tracking if the bike is stolen.
 
 ```{r}
 bike_type_names <- c(
@@ -292,12 +341,12 @@ bike_type_names <- c(
   "OT" = "Other Bike", 
   "RC" = "Road Bike", 
   "RE" = "Hybrid Bike",
-  "RG" = "??", 
-  "SC" = "??", 
-  "TA" = "??", 
-  "TO" = "??", 
-  "TR" = "??", 
-  "UN" = "Unspecified"
+  "RG" = "Regular Bike", 
+  "SC" = "Scooter", 
+  "TA" = "Tandem", 
+  "TO" = "Touring", 
+  "TR" = "Tricycle", 
+  "UN" = "Unicycle"
 )
 
 custom_colors <- c("royalblue", "maroon3", "springgreen4", "salmon",
@@ -320,10 +369,25 @@ ggplot(bike_thefts, aes(x = BIKE_TYPE, fill = BIKE_TYPE)) +
   )
 ```
 
-### Reporting Delays
+### From Theft to Recovery
 
-Analyzing the time delay between theft occurrence and reporting date
-(Not working, got to tweajk it some more)
+In an urban city like Toronto people are increasingly turning to
+bicycles for convenience and sustainability, yet they face the threat of
+losing their bikes. The significant disparity between stolen bikes and
+recovered ones reflects the lack of infrastructure, resources, and
+efficient tracking systems for bicycle theft. The 1% recovery rate of
+bicycles becomes a rallying cry for activists and urban planners who
+promote cycling as an eco-friendly alternative to cars. In response to
+this challenge, the City of Toronto has introduced initiatives like
+StreetSmartsTO, that is a program designed to support the city’s growing
+cycling community. Although these efforts are a step in the right
+direction, it is evident that there is still a long way to go in
+creating a safer environment for cyclists. City also encourages
+residents to register their bikes with the Toronto Police Service’s bike
+registration program. While registering a bike can help track it in case
+of theft, the reality is that this alone won’t solve the problem. In
+order to see real change, Toronto will need to invest in smarter
+tracking technologies and more secure bike parking options
 
 ```{r}
 # Pie Chart of recovery vs stolen
@@ -344,52 +408,11 @@ ggplot(recovery_status, aes(x = "", y = n, fill = STATUS)) +
   scale_fill_brewer(palette = "Dark2")
 
 ```
-```{r}
-# MAP OF RECOVERY RATE 
-recovery_by_neighborhood <- bike_thefts %>%
-  group_by(NEIGHBOURHOOD_Clean) %>%
-  summarize(
-    total_thefts = n(),
-    recovered = sum(STATUS == "RECOVERED", na.rm = TRUE),
-    recovery_rate = recovered / total_thefts
-  )
 
-
-if (!"sf" %in% class(recovery_by_neighborhood)) {
-  toronto_recovery_map <- toronto_shape %>%
-    left_join(recovery_by_neighborhood, by = "NEIGHBOURHOOD_Clean")
-} else {
-  toronto_recovery_map <- st_join(toronto_shape, recovery_by_neighborhood, left = TRUE)
-}
-
-ggplot(toronto_recovery_map) +
-  geom_sf(aes(fill = recovery_rate), color = "grey") +
-  scale_fill_viridis_c(option = "plasma", name = "Recovery Rate") +
-  labs(title = "Bike Theft Recovery Rate by Neighborhood in Toronto") +
-  theme_void() +
-  theme(plot.title = element_text(hjust = 0.5))
-```
-
-
-### Theft Recovery Analysis by Neighborhood
-
-which neighborhoods have higher recovery rates and analyzing the
-recovered vs unrecovered bikes by neighborhood
-
-```{r}
-# calculating recovery rate by neighborhood
-recovery_by_neighborhood <- bike_thefts %>%
-  group_by(NEIGHBOURHOOD_Clean) %>%
-  summarize(
-    total_thefts = n(),
-    recovered = sum(STATUS == "RECOVERED"),
-    recovery_rate = recovered / total_thefts
-  ) %>%
-  slice_max(recovery_rate, n = 10) 
-
-ggplot(recovery_by_neighborhood, aes(x = reorder(NEIGHBOURHOOD_Clean, recovery_rate), y = recovery_rate)) +
-  geom_bar(stat = "identity", fill = "forestgreen") +
-  coord_flip() +
-  labs(title = "Top 10 Neighborhoods by Recovery Rate", x = "Neighborhood", y = "Recovery Rate") +
-  theme_minimal()
-```
+This analysis suggests that Toronto Police and Biker's Association
+should pay more attention to Downtown area in order to reduce the city’s
+overall bike theft rate. The city should prioritize installation of
+enough locking stations in well lit areas to provide adequate visibility
+and deter criminals. As an individual, one must invest in a good solid
+lock and register their bike with its serial number to save the trouble
+if they loose their bike in future.
