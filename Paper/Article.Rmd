@@ -2,14 +2,11 @@
 title: "Just Take the Bus: Analysis of Toronto Bike Theft from 2014-2023"
 subtitle: "Examining Patterns, Locations, and Factors of Bicycle Theft in Toronto"
 author:
-- Rayan Awad Alim
-- Samreen Kaur
+- Rayan Awad Alim & Samreen Kaur
 thanks: https://github.com/RayanAlim/Toronto_Bike_Thefts_Data_Analysis
 # date: "November 12, 2024"
 # abstract: This analysis examines Bike theft data obtained from the Tronrot Police Data Portal.
 output: pdf_document
-toc: true
-number-sections: true
 editor_options:
   markdown:
     wrap: 72
@@ -40,7 +37,8 @@ required_packages <- c(
   "Scales",
   "pak",
   "patchwork",
-  "gridExtra"
+  "gridExtra",
+  "ggrepel"
 ) 
 for (p in required_packages) { # install if missing
   if (!require(p, character.only = TRUE)) {
@@ -64,6 +62,7 @@ library(scales)
 library(pak)
 library(patchwork)
 library(gridExtra)
+library(ggrepel)
 ```
 
 ```{r}
@@ -98,19 +97,39 @@ bike_thefts_sf <- read_sf(here("Data", "Bicycle_Thefts_Open_Data.geojson")) |>
 toronto_shape <- read_sf(here("Data", "Neighbourhoods - 4326.shp")) 
 ```
 
+If you live in Toronto, brace yourself: if your bike gets stolen, the chances of getting it back are slim. In fact, the odds are roughly 1%- about as likely as your chances at being struck by lightning twice in your Life. But don’t give up hope just yet! In this data-driven analysis, we break down the patterns and factors behind bike theft in Toronto, so cyclists can arm themselves with knowledge, and maybe a stronger lock.
+
+This analysis aims to inform the general public and cyclists about Toronto’s bike theft hotspots, highlighting neighborhoods with the highest rate of thefts and times when bikes are most at risk and recovery rate of different neighbourhoods. It would not only raise awareness but also help general public and Toronto police take proactive measures to secure bikes, ultimately reducing the risk of theft and fostering a safer cycling environment in Toronto.
+
 ```{r}
-# glimpse(toronto_shape)
-# glimpse(bike_thefts)
+#| fig.width: 6
+#| fig.height: 7
+#| fig.align: center
+
+# Pie Chart of recovery vs stolen
+
+recovery_status <- bike_thefts %>%
+  count(STATUS) %>%
+  mutate(percentage = n / sum(n) * 100,
+         label = paste0(STATUS, ": ", round(percentage, 1), "%")) 
+
+ggplot(recovery_status, aes(x = "", y = n, fill = STATUS)) +
+  geom_bar(stat = "identity", width = 0.6) +
+  coord_polar("y", start = 0) +
+  geom_label_repel(aes(label = label, fill = STATUS),            
+                   color = "white",                              
+                   size = 4,                                     
+                   nudge_x = 0.8,                                
+                   show.legend = FALSE,                          
+                   segment.color = "grey20",                    
+                   segment.size = 0.6) + 
+  labs(title = "Bike Recovery Status: Recovered vs. Stolen") +
+  theme(legend.position = "none") +
+  theme_void() +
+  scale_fill_brewer(palette = "Dark2") 
 ```
 
-This analysis aims to inform the general public and cyclists about
-Toronto’s bike theft hotspots, highlighting neighborhoods with the
-highest rate of thefts and times when bikes are most at risk. It would
-not only raise awareness but also help general public and Toronto police
-take proactive measures to secure bikes, ultimately reducing the risk of
-theft and fostering a safer cycling environment in Toronto.
-
-### Bicycle Theft over time: Tracking trends in top 10 neighborhoods
+### Bicycle Theft At a Steady Increase Post-pandemic
 
 Analyzing trend in bicycle theft over past 5 years, notice that there is
 approximately 15% drop in bike thefts from 2019 to 2023. This suggests
@@ -136,7 +155,7 @@ bike_thefts %>%
   ggplot(aes(x = factor(OCC_YEAR), y = total_thefts, group = 1)) + 
   geom_line(color = "#458CFF") +
   geom_point(size = 3) +
-  labs(title = "Total Bike Thefts in Top 10 Neighborhoods (2019-2023)",
+  labs(title = "Yearly Breakdown of Bicycle Theft Trends in Toronto",
        x = "Year", y = "Total Thefts") +
   theme_minimal() +
   theme(legend.position = "none")
@@ -222,39 +241,45 @@ allocate more resources in downtown particularly during weekdays to
 reduce the frequency of theft in high-risk areas.
 
 ```{r}
+#| fig.width: 10
+#| fig.height: 7
+#| fig.align: center
+#| 
 # Bike Thefts by Month
 bike_thefts <- bike_thefts %>%
   mutate(OCC_MONTH = factor(OCC_MONTH, levels = month.name))
 
-bike_thefts %>%
+plot_by_month <- bike_thefts %>%
   count(OCC_MONTH) %>%
   ggplot(aes(x = OCC_MONTH, y = n, fill = OCC_MONTH)) +
   geom_bar(stat = "identity") +
-  labs(caption = "Bike Thefts by Month of the Year",
+  labs(title = "Seasonal Thefts, Nothing Like A Sunny \n Day To Snatch a Bike",
+       caption = "Bike Thefts by Month of the Year",
        x = "Month", y = "Number of Thefts") +
   theme_minimal() +
   scale_fill_brewer(palette = "Set3") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   guides(fill = "none") +
   theme(plot.caption = element_text(hjust = 0.5))
-```
 
-```{r}
 bike_thefts <- bike_thefts %>%
   mutate(OCC_DOW = factor(OCC_DOW, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")))
 
-bike_thefts %>%
+plot_by_day <- bike_thefts %>%
   count(OCC_DOW) %>%
   ggplot(aes(x = OCC_DOW, y = n, fill = OCC_DOW)) +
   geom_bar(stat = "identity") +
-  labs(title = "Bike Theft Patterns by Week Day Slight Uptick on Fridays",
+  labs(title = "Bike Theft Patterns by Week Day Slight\n Uptick on Fridays",
        x = "Day of the Week", 
        y = "Number of Thefts", 
        fill = "Day of Week",
-       caption = "Bike thefts in Toronto show a consistent pattern across weekdays, with a small increase on Fridays.") +  
+       caption = "A consistent pattern across weekdays, with a small increase on Fridays.") +  
   theme_minimal() +
-  scale_fill_brewer(palette = "Set3")+
+  scale_fill_brewer(palette = "Set3") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   guides(fill = "none")
+
+grid.arrange(plot_by_month, plot_by_day, ncol=2, widths = c(3, 3))
 
 ```
 
@@ -269,6 +294,9 @@ bikes to resell them. This calls for improved lighting and overnight
 surveillance to deter thieves during these vulnerable hours.
 
 ```{r}
+#| fig.height: 3
+#| fig.align: center
+
 bike_thefts <- bike_thefts %>%
   mutate(OCC_DOW = factor(OCC_DOW, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")))
 
@@ -279,8 +307,7 @@ ggplot(bike_thefts, aes(x = OCC_DOW, y = OCC_HOUR)) +
   labs(
     title = "Bike Theft Patterns by Day and Hour",
     x = "Day of the Week",
-    y = "Hour of Day",
-    caption = "TBD",
+    y = "Hour of Day"
   ) +
   theme_minimal() +
   theme(
@@ -302,6 +329,9 @@ ultimately impacting taxpayers when more resources are allocated to
 reduce thefts.
 
 ```{r}
+#| fig.height: 3
+#| fig.align: center
+
 total_cost_by_neighborhood <- bike_thefts %>%
   group_by(NEIGHBOURHOOD_Clean) %>%
   summarize(total_cost = sum(BIKE_COST, na.rm = TRUE)) 
@@ -336,6 +366,9 @@ can be discreetly attached to bikes and synced with smartphone apps,
 enabling real-time tracking if the bike is stolen.
 
 ```{r}
+#| fig.height: 3
+#| fig.align: center
+
 bike_type_names <- c(
   "BM" = "BMX", 
   "EL" = "Electric Bike", 
@@ -392,26 +425,6 @@ of theft, the reality is that this alone won’t solve the problem. In
 order to see real change, Toronto will need to invest in smarter
 tracking technologies and more secure bike parking options
 
-```{r}
-# Pie Chart of recovery vs stolen
-
-recovery_status <- bike_thefts %>%
-  count(STATUS) %>%
-  mutate(percentage = n / sum(n) * 100)
-
-ggplot(recovery_status, aes(x = "", y = n, fill = STATUS)) +
-  geom_bar(stat = "identity", width = 1) +
-  coord_polar("y", start = 0) +
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5),
-            color = "white") +
-  labs(title = "Bike Recovery Status: Recovered vs Stolen",
-       fill = "Status") +
-  theme_void() +
-  scale_fill_brewer(palette = "Dark2") +
-  theme(title = element_text(hjust = 0.5, size = 12))
-
-```
 
 This analysis suggests that Toronto Police and Biker's Association
 should pay more attention to Downtown area in order to reduce the city’s
